@@ -90,6 +90,13 @@ public class Photo {
     @Column(name = "height")
     private Integer height;
 
+    /**
+     * AI-generated description of image content
+     */
+    @Size(max = 2000)
+    @Column(name = "image_description", length = 2000)
+    private String imageDescription;
+
     // Default constructor
     public Photo() {
         this.id = UUID.randomUUID().toString();
@@ -198,6 +205,14 @@ public class Photo {
         this.height = height;
     }
 
+    public String getImageDescription() {
+        return imageDescription;
+    }
+
+    public void setImageDescription(String imageDescription) {
+        this.imageDescription = imageDescription;
+    }
+
     @Override
     public String toString() {
         return "Photo{" +
@@ -210,6 +225,7 @@ public class Photo {
                 ", uploadedAt=" + uploadedAt +
                 ", width=" + width +
                 ", height=" + height +
+                ", imageDescription='" + imageDescription + '\'' +
                 '}';
     }
 }

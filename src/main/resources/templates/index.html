@@ -107,6 +107,12 @@
                                         <span th:if="${photo.width != null && photo.height != null}" th:text="' &#8226; ' + ${photo.width} + ' x ' + ${photo.height}"></span>
                                     </small>
                                 </p>
+                                <p class="card-text" th:if="${photo.imageDescription != null && !#strings.isEmpty(photo.imageDescription)}">
+                                    <small class="text-muted" th:text="${photo.imageDescription}"></small>
+                                </p>
+                                <p class="card-text" th:unless="${photo.imageDescription != null && !#strings.isEmpty(photo.imageDescription)}">
+                                    <small class="text-muted fst-italic">No image description available.</small>
+                                </p>
                             </div>
                         </div>
                     </div>

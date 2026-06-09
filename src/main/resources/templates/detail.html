@@ -125,14 +125,21 @@
                                         <dd class="col-sm-7" th:text="${photo.width} + ' x ' + ${photo.height} + ' px'"></dd>
                                     </div>
 
-                                    <dt class="col-sm-5">Type:</dt>
-                                    <dd class="col-sm-7">
-                                        <span class="badge bg-secondary" th:text="${photo.mimeType}"></span>
-                                    </dd>
-                                </dl>
-                            </div>
-                        </div>
-                    </div>
+                                     <dt class="col-sm-5">Type:</dt>
+                                     <dd class="col-sm-7">
+                                         <span class="badge bg-secondary" th:text="${photo.mimeType}"></span>
+                                     </dd>
+
+                                     <dt class="col-sm-5">Description:</dt>
+                                     <dd class="col-sm-7" th:if="${photo.imageDescription != null && !#strings.isEmpty(photo.imageDescription)}"
+                                         th:text="${photo.imageDescription}"></dd>
+                                     <dd class="col-sm-7 fst-italic text-muted" th:unless="${photo.imageDescription != null && !#strings.isEmpty(photo.imageDescription)}">
+                                         No image description available.
+                                     </dd>
+                                 </dl>
+                             </div>
+                         </div>
+                     </div>
                 </div>
             </div>
         </main>

@@ -177,6 +177,9 @@
         const timestamp = new Date().getTime();
         const photoUrl = `/photo/${photo.id}?_t=${timestamp}`;
         const detailUrl = `/detail/${photo.id}`;
+        const description = photo.imageDescription
+            ? `<p class="card-text"><small class="text-muted">${escapeHtml(photo.imageDescription)}</small></p>`
+            : '<p class="card-text"><small class="text-muted fst-italic">No image description available.</small></p>';
 
         return `
             <div class="col-12 col-sm-6 col-md-4 col-lg-3 mb-4">
@@ -196,10 +199,20 @@
                                 ${Math.round(photo.fileSize / 1024)} KB${dimensions}
                             </small>
                         </p>
+                        ${description}
                     </div>
                 </div>
             </div>
         `;
+    }
+
+    function escapeHtml(value) {
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     function showSuccess(message) {

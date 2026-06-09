@@ -52,4 +52,12 @@ public interface PhotoService {
      * @return Next photo if found, empty otherwise
      */
     Optional<Photo> getNextPhoto(Photo currentPhoto);
+
+    /**
+     * Generate an image description using an Azure-hosted LLM
+     * @param photoData Raw image bytes
+     * @param mimeType MIME type of the image
+     * @return Generated description, or null when unavailable
+     */
+    String generateImageDescription(byte[] photoData, String mimeType);
 }

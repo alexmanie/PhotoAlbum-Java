@@ -77,12 +77,13 @@ public class HomeController {
                     uploadedPhoto.put("originalFileName", photo.getOriginalFileName());
                     uploadedPhoto.put("filePath", photo.getFilePath());
                     uploadedPhoto.put("uploadedAt", photo.getUploadedAt());
-                    uploadedPhoto.put("fileSize", photo.getFileSize());
-                    uploadedPhoto.put("width", photo.getWidth());
-                    uploadedPhoto.put("height", photo.getHeight());
-                    uploadedPhotos.add(uploadedPhoto);
-                }
-            } else {
+                     uploadedPhoto.put("fileSize", photo.getFileSize());
+                     uploadedPhoto.put("width", photo.getWidth());
+                     uploadedPhoto.put("height", photo.getHeight());
+                     uploadedPhoto.put("imageDescription", photo.getImageDescription());
+                     uploadedPhotos.add(uploadedPhoto);
+                 }
+             } else {
                 Map<String, Object> failedUpload = new HashMap<String, Object>();
                 failedUpload.put("fileName", result.getFileName());
                 failedUpload.put("error", result.getErrorMessage());

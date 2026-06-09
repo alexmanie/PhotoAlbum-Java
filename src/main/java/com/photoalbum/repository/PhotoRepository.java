@@ -20,7 +20,7 @@ public interface PhotoRepository extends JpaRepository<Photo, String> {
      * @return List of photos ordered by upload date descending
      */
     @Query(value = "SELECT ID, ORIGINAL_FILE_NAME, PHOTO_DATA, STORED_FILE_NAME, FILE_PATH, FILE_SIZE, " +
-                   "MIME_TYPE, UPLOADED_AT, WIDTH, HEIGHT " +
+                   "MIME_TYPE, UPLOADED_AT, WIDTH, HEIGHT, IMAGE_DESCRIPTION " +
                    "FROM PHOTOS " +
                    "ORDER BY UPLOADED_AT DESC", 
            nativeQuery = true)
@@ -33,7 +33,7 @@ public interface PhotoRepository extends JpaRepository<Photo, String> {
      */
     @Query(value = "SELECT * FROM (" +
                    "SELECT ID, ORIGINAL_FILE_NAME, PHOTO_DATA, STORED_FILE_NAME, FILE_PATH, FILE_SIZE, " +
-                   "MIME_TYPE, UPLOADED_AT, WIDTH, HEIGHT, ROWNUM as RN " +
+                   "MIME_TYPE, UPLOADED_AT, WIDTH, HEIGHT, IMAGE_DESCRIPTION, ROWNUM as RN " +
                    "FROM PHOTOS " +
                    "WHERE UPLOADED_AT < :uploadedAt " +
                    "ORDER BY UPLOADED_AT DESC" +
@@ -48,7 +48,7 @@ public interface PhotoRepository extends JpaRepository<Photo, String> {
      */
     @Query(value = "SELECT ID, ORIGINAL_FILE_NAME, PHOTO_DATA, STORED_FILE_NAME, " +
                    "NVL(FILE_PATH, 'default_path') as FILE_PATH, FILE_SIZE, " +
-                   "MIME_TYPE, UPLOADED_AT, WIDTH, HEIGHT " +
+                   "MIME_TYPE, UPLOADED_AT, WIDTH, HEIGHT, IMAGE_DESCRIPTION " +
                    "FROM PHOTOS " +
                    "WHERE UPLOADED_AT > :uploadedAt " +
                    "ORDER BY UPLOADED_AT ASC", 
@@ -62,7 +62,7 @@ public interface PhotoRepository extends JpaRepository<Photo, String> {
      * @return List of photos uploaded in the specified month
      */
     @Query(value = "SELECT ID, ORIGINAL_FILE_NAME, PHOTO_DATA, STORED_FILE_NAME, FILE_PATH, FILE_SIZE, " +
-                   "MIME_TYPE, UPLOADED_AT, WIDTH, HEIGHT " +
+                   "MIME_TYPE, UPLOADED_AT, WIDTH, HEIGHT, IMAGE_DESCRIPTION " +
                    "FROM PHOTOS " +
                    "WHERE TO_CHAR(UPLOADED_AT, 'YYYY') = :year " +
                    "AND TO_CHAR(UPLOADED_AT, 'MM') = :month " +
@@ -79,7 +79,7 @@ public interface PhotoRepository extends JpaRepository<Photo, String> {
     @Query(value = "SELECT * FROM (" +
                    "SELECT P.*, ROWNUM as RN FROM (" +
                    "SELECT ID, ORIGINAL_FILE_NAME, PHOTO_DATA, STORED_FILE_NAME, FILE_PATH, FILE_SIZE, " +
-                   "MIME_TYPE, UPLOADED_AT, WIDTH, HEIGHT " +
+                   "MIME_TYPE, UPLOADED_AT, WIDTH, HEIGHT, IMAGE_DESCRIPTION " +
                    "FROM PHOTOS ORDER BY UPLOADED_AT DESC" +
                    ") P WHERE ROWNUM <= :endRow" +
                    ") WHERE RN >= :startRow", 
@@ -91,7 +91,7 @@ public interface PhotoRepository extends JpaRepository<Photo, String> {
      * @return List of photos with running totals and rankings
      */
     @Query(value = "SELECT ID, ORIGINAL_FILE_NAME, PHOTO_DATA, STORED_FILE_NAME, FILE_PATH, FILE_SIZE, " +
-                   "MIME_TYPE, UPLOADED_AT, WIDTH, HEIGHT, " +
+                   "MIME_TYPE, UPLOADED_AT, WIDTH, HEIGHT, IMAGE_DESCRIPTION, " +
                    "RANK() OVER (ORDER BY FILE_SIZE DESC) as SIZE_RANK, " +
                    "SUM(FILE_SIZE) OVER (ORDER BY UPLOADED_AT ROWS UNBOUNDED PRECEDING) as RUNNING_TOTAL " +
                    "FROM PHOTOS " +

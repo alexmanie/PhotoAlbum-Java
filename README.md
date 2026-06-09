@@ -8,6 +8,7 @@ A photo gallery application built with Spring Boot and Oracle Database, featurin
 - 🖼️ **Gallery View**: Responsive grid layout for browsing uploaded photos  
 - 🔍 **Photo Detail View**: Click any photo to view full-size with metadata and navigation
 - 📊 **Metadata Display**: View file size, dimensions, aspect ratio, and upload timestamp
+- 🧠 **AI Image Description**: Optionally generate an image description using Azure OpenAI during upload
 - ⬅️➡️ **Photo Navigation**: Previous/Next buttons to browse through photos
 - ✅ **Validation**: File type and size validation (JPEG, PNG, GIF, WebP; max 10MB)
 - 🗄️ **Database Storage**: Photo data stored as BLOBs in Oracle Database
@@ -98,6 +99,7 @@ The application creates the following table structure in Oracle:
 - `UPLOADED_AT` (TIMESTAMP, Not Null, Default SYSTIMESTAMP)
 - `WIDTH` (NUMBER, Nullable)
 - `HEIGHT` (NUMBER, Nullable)
+- `IMAGE_DESCRIPTION` (VARCHAR2(2000), Nullable)
 - `PHOTO_DATA` (BLOB, Not Null)
 
 #### Indexes
@@ -140,6 +142,20 @@ The application creates the following table structure in Oracle:
    ```bash
    mvn spring-boot:run
    ```
+
+### Optional: Enable Azure OpenAI image descriptions
+
+Set these properties in `src/main/resources/application.properties` (or environment-specific overrides):
+
+```properties
+app.azure-openai.enabled=true
+app.azure-openai.endpoint=https://<your-resource-name>.openai.azure.com
+app.azure-openai.deployment=<your-model-deployment-name>
+app.azure-openai.api-key=<your-azure-openai-api-key>
+app.azure-openai.api-version=2024-02-15-preview
+```
+
+When enabled, each uploaded image is sent to the configured Azure OpenAI deployment and the generated description is saved in `PHOTOS.IMAGE_DESCRIPTION`.
 
 ### Building from Source
 

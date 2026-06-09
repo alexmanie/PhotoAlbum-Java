@@ -1,5 +1,8 @@
 package com.photoalbum.service.impl;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.photoalbum.model.Photo;
 import com.photoalbum.model.UploadResult;
 import com.photoalbum.repository.PhotoRepository;
@@ -7,16 +10,28 @@ import com.photoalbum.service.PhotoService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -30,16 +45,36 @@ public class PhotoServiceImpl implements PhotoService {
     private static final Logger logger = LoggerFactory.getLogger(PhotoServiceImpl.class);
 
     private final PhotoRepository photoRepository;
+    private final ObjectMapper objectMapper;
     private final long maxFileSizeBytes;
     private final List<String> allowedMimeTypes;
+    private final boolean azureOpenAiEnabled;
+    private final String azureOpenAiEndpoint;
+    private final String azureOpenAiDeployment;
+    private final String azureOpenAiApiKey;
+    private final String azureOpenAiApiVersion;
+    private final RestTemplate restTemplate;
 
     public PhotoServiceImpl(
             PhotoRepository photoRepository,
+            ObjectMapper objectMapper,
             @Value("${app.file-upload.max-file-size-bytes}") long maxFileSizeBytes,
-            @Value("${app.file-upload.allowed-mime-types}") String[] allowedMimeTypes) {
+            @Value("${app.file-upload.allowed-mime-types}") String[] allowedMimeTypes,
+            @Value("${app.azure-openai.enabled:false}") boolean azureOpenAiEnabled,
+            @Value("${app.azure-openai.endpoint:}") String azureOpenAiEndpoint,
+            @Value("${app.azure-openai.deployment:}") String azureOpenAiDeployment,
+            @Value("${app.azure-openai.api-key:}") String azureOpenAiApiKey,
+            @Value("${app.azure-openai.api-version:2024-02-15-preview}") String azureOpenAiApiVersion) {
         this.photoRepository = photoRepository;
+        this.objectMapper = objectMapper;
         this.maxFileSizeBytes = maxFileSizeBytes;
         this.allowedMimeTypes = Arrays.asList(allowedMimeTypes);
+        this.azureOpenAiEnabled = azureOpenAiEnabled;
+        this.azureOpenAiEndpoint = azureOpenAiEndpoint;
+        this.azureOpenAiDeployment = azureOpenAiDeployment;
+        this.azureOpenAiApiKey = azureOpenAiApiKey;
+        this.azureOpenAiApiVersion = azureOpenAiApiVersion;
+        this.restTemplate = new RestTemplate();
     }
 
     /**
@@ -147,6 +182,7 @@ public class PhotoServiceImpl implements PhotoService {
             );
             photo.setWidth(width);
             photo.setHeight(height);
+            photo.setImageDescription(generateImageDescription(photoData, file.getContentType()));
 
             // Save to database (with BLOB photo data)
             try {
@@ -217,6 +253,60 @@ public class PhotoServiceImpl implements PhotoService {
     }
 
     /**
+     * Generate an image description using Azure OpenAI chat completions API
+     */
+    @Override
+    public String generateImageDescription(byte[] photoData, String mimeType) {
+        if (!azureOpenAiEnabled) {
+            return null;
+        }
+
+        if (photoData == null || photoData.length == 0) {
+            logger.warn("Skipping image description generation: empty image payload");
+            return null;
+        }
+
+        if (azureOpenAiEndpoint == null || azureOpenAiEndpoint.trim().isEmpty()
+                || azureOpenAiDeployment == null || azureOpenAiDeployment.trim().isEmpty()
+                || azureOpenAiApiKey == null || azureOpenAiApiKey.trim().isEmpty()) {
+            logger.warn("Skipping image description generation: Azure OpenAI configuration is incomplete");
+            return null;
+        }
+
+        String safeMimeType = (mimeType == null || mimeType.trim().isEmpty()) ? "image/jpeg" : mimeType;
+        String dataUrl = "data:" + safeMimeType + ";base64," + Base64.getEncoder().encodeToString(photoData);
+
+        try {
+            String url = UriComponentsBuilder
+                    .fromHttpUrl(azureOpenAiEndpoint)
+                    .pathSegment("openai", "deployments", azureOpenAiDeployment, "chat", "completions")
+                    .queryParam("api-version", azureOpenAiApiVersion)
+                    .toUriString();
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("api-key", azureOpenAiApiKey);
+
+            String requestBody = buildImageDescriptionRequest(dataUrl);
+            HttpEntity<String> request = new HttpEntity<String>(requestBody, headers);
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, request, String.class);
+
+            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                logger.warn("Azure OpenAI image description request failed with status {}", response.getStatusCodeValue());
+                return null;
+            }
+
+            return extractDescriptionFromResponse(response.getBody());
+        } catch (RestClientException ex) {
+            logger.error("Failed to call Azure OpenAI for image description", ex);
+            return null;
+        } catch (IOException ex) {
+            logger.error("Failed to parse Azure OpenAI response for image description", ex);
+            return null;
+        }
+    }
+
+    /**
      * Extract file extension from filename
      */
     private String getFileExtension(String filename) {
@@ -225,5 +315,72 @@ public class PhotoServiceImpl implements PhotoService {
         }
         int lastDotIndex = filename.lastIndexOf('.');
         return lastDotIndex > 0 ? filename.substring(lastDotIndex) : "";
+    }
+
+    private String buildImageDescriptionRequest(String dataUrl) throws JsonProcessingException {
+        Map<String, Object> payload = new HashMap<String, Object>();
+        List<Map<String, Object>> messages = new ArrayList<Map<String, Object>>();
+
+        Map<String, Object> systemMessage = new HashMap<String, Object>();
+        systemMessage.put("role", "system");
+        systemMessage.put("content", "You describe images for a photo gallery using concise, factual language.");
+        messages.add(systemMessage);
+
+        Map<String, Object> textContent = new HashMap<String, Object>();
+        textContent.put("type", "text");
+        textContent.put("text", "Describe this image in one short sentence.");
+
+        Map<String, Object> imageUrlObject = new HashMap<String, Object>();
+        imageUrlObject.put("url", dataUrl);
+
+        Map<String, Object> imageContent = new HashMap<String, Object>();
+        imageContent.put("type", "image_url");
+        imageContent.put("image_url", imageUrlObject);
+
+        List<Map<String, Object>> userContent = new ArrayList<Map<String, Object>>();
+        userContent.add(textContent);
+        userContent.add(imageContent);
+
+        Map<String, Object> userMessage = new HashMap<String, Object>();
+        userMessage.put("role", "user");
+        userMessage.put("content", userContent);
+        messages.add(userMessage);
+
+        payload.put("messages", messages);
+        payload.put("temperature", 0.2);
+        payload.put("max_tokens", 120);
+
+        return objectMapper.writeValueAsString(payload);
+    }
+
+    private String extractDescriptionFromResponse(String responseBody) throws IOException {
+        JsonNode root = objectMapper.readTree(responseBody);
+        JsonNode contentNode = root.path("choices").path(0).path("message").path("content");
+
+        if (contentNode.isMissingNode() || contentNode.isNull()) {
+            return null;
+        }
+
+        if (contentNode.isTextual()) {
+            String description = contentNode.asText().trim();
+            return description.isEmpty() ? null : description;
+        }
+
+        if (contentNode.isArray()) {
+            StringBuilder builder = new StringBuilder();
+            for (JsonNode item : contentNode) {
+                JsonNode textNode = item.path("text");
+                if (textNode.isTextual()) {
+                    if (builder.length() > 0) {
+                        builder.append(' ');
+                    }
+                    builder.append(textNode.asText().trim());
+                }
+            }
+            String description = builder.toString().trim();
+            return description.isEmpty() ? null : description;
+        }
+
+        return null;
     }
 }
