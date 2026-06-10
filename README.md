@@ -1,6 +1,6 @@
 # Photo Album Application - Java Spring Boot with Oracle DB
 
-A photo gallery application built with Spring Boot and Oracle Database, featuring drag-and-drop upload, responsive gallery view, and full-size photo details with navigation.
+A photo gallery application built with a Spring Boot REST API and a React single-page front-end, backed by Oracle Database, featuring drag-and-drop upload, responsive gallery view, and full-size photo details with navigation.
 
 ## Features
 
@@ -17,18 +17,41 @@ A photo gallery application built with Spring Boot and Oracle Database, featurin
 
 ## Technology Stack
 
-- **Framework**: Spring Boot 2.7.18 (Java 8)
+- **Backend Framework**: Spring Boot 2.7.18 (Java 8) — JSON REST API
+- **Frontend**: React 18 + TypeScript (Vite), React Router, Bootstrap 5.3.0
 - **Database**: Oracle Database 21c Express Edition
-- **Templating**: Thymeleaf
-- **Build Tool**: Maven
-- **Frontend**: Bootstrap 5.3.0, Vanilla JavaScript
+- **Build Tool**: Maven (with `frontend-maven-plugin` to build and bundle the React app)
 - **Containerization**: Docker & Docker Compose
+
+## Architecture
+
+The Spring Boot application exposes a JSON REST API and serves the compiled React
+single-page application as static assets from the same JAR.
+
+- The React app (in [`frontend/`](frontend/)) is built by Vite into `frontend/dist`.
+- During the Maven build, `frontend-maven-plugin` runs `npm install` and `npm run build`,
+  and the output is copied into the Spring Boot `static/` resources.
+- React Router handles client-side routing; deep links such as `/detail/{id}` are
+  forwarded to `index.html` by `WebConfig` so the SPA can resolve them.
+
+### REST API Endpoints
+
+| Method   | Endpoint                          | Description                                   |
+| -------- | --------------------------------- | --------------------------------------------- |
+| `GET`    | `/api/config`                     | Runtime config flags (e.g. `aiEnabled`)       |
+| `GET`    | `/api/photos`                     | List all photos (metadata, newest first)      |
+| `GET`    | `/api/photos/{id}`                | Single photo metadata + prev/next navigation  |
+| `POST`   | `/api/photos/upload`              | Upload one or more photos (multipart)         |
+| `DELETE` | `/api/photos/{id}`                | Delete a photo                                |
+| `GET`    | `/api/photos/{id}/description`    | Poll for the AI-generated description         |
+| `GET`    | `/photo/{id}`                     | Serve the binary photo content                |
 
 ## Prerequisites
 
 - Docker Desktop installed and running
 - Docker Compose (included with Docker Desktop)
 - Minimum 4GB RAM available for Oracle DB container
+- Node.js 18+ and npm (only required for local frontend development; the Maven build provisions its own Node via `frontend-maven-plugin`)
 - *(Optional)* Azure OpenAI resource with a GPT-4o (or other vision-capable) deployment for AI descriptions
 
 ## Quick Start
@@ -123,6 +146,24 @@ The application creates the following table structure in Oracle:
 
 ## Development
 
+### Frontend dev server (recommended workflow)
+
+For fast React development with hot module reload, run the backend and the Vite
+dev server in two terminals:
+
+```bash
+# Terminal 1 - Spring Boot API on http://localhost:8080
+mvn spring-boot:run
+
+# Terminal 2 - React dev server on http://localhost:3000 (proxies /api and /photo to :8080)
+cd frontend
+npm install
+npm run dev
+```
+
+Then open **http://localhost:3000**. API and photo requests are proxied to the
+Spring Boot backend automatically (see [`frontend/vite.config.ts`](frontend/vite.config.ts)).
+
 ### Running Locally (without Docker)
 
 1. **Install Oracle Database** (or use Oracle XE)
@@ -146,12 +187,15 @@ The application creates the following table structure in Oracle:
 ### Building from Source
 
 ```bash
-# Build the JAR file
+# Build the JAR file (also builds the React app and bundles it as static assets)
 mvn clean package
 
 # Run the JAR file
 java -jar target/photo-album-1.0.0.jar
 ```
+
+The single resulting JAR serves both the REST API and the React SPA at
+**http://localhost:8080**.
 
 ## Troubleshooting
 
@@ -222,7 +266,12 @@ Oracle Enterprise Manager is available at `http://localhost:5500/em` for databas
 
 ```
 PhotoAlbum/
-├── src/                             # Java source code
+├── frontend/                        # React + TypeScript single-page app (Vite)
+│   ├── src/                         # React components, pages, hooks, API client
+│   ├── index.html                   # SPA entry point
+│   ├── package.json                 # Frontend dependencies and scripts
+│   └── vite.config.ts               # Vite build + dev proxy configuration
+├── src/                             # Java source code (REST API)
 ├── oracle-init/                     # Oracle initialization scripts
 ├── docker-compose.yml               # Oracle + Application services
 ├── Dockerfile                       # Application container build
@@ -244,7 +293,7 @@ When contributing to this project:
 
 ## Azure OpenAI Integration
 
-When a photo is uploaded the application asynchronously calls Azure OpenAI to generate a natural-language description of the image. The description is displayed in both the gallery card and the detail view and appears **live without a page refresh** via a lightweight JavaScript polling mechanism.
+When a photo is uploaded the application asynchronously calls Azure OpenAI to generate a natural-language description of the image. The description is displayed in both the gallery card and the detail view and appears **live without a page refresh** via a React polling hook that queries the `/api/photos/{id}/description` endpoint.
 
 ### Configuration
 
