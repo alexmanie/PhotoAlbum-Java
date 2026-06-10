@@ -11,18 +11,17 @@ import com.photoalbum.service.PhotoService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 /**
  * Controller for displaying a single photo in full size
  */
-@Controller
-@RequestMapping("/detail")
+@RestController
 public class DetailController {
 
     private static final Logger logger = LoggerFactory.getLogger(DetailController.class);
@@ -36,56 +35,76 @@ public class DetailController {
         this.aiEnabled = aiEnabled;
     }
 
-    /**
-     * Handles GET requests to display a photo
-     */
-    @GetMapping("/{id}")
-    public String detail(@PathVariable String id, Model model) {
+    @GetMapping("/api/photos/{id}")
+    public ResponseEntity<Map<String, Object>> getPhotoDetail(@PathVariable String id) {
         if (id == null || id.trim().isEmpty()) {
-            return "redirect:/";
+            return ResponseEntity.badRequest().body(errorResponse("Photo ID is required"));
         }
 
         try {
             Optional<Photo> photoOpt = photoService.getPhotoById(id);
             if (!photoOpt.isPresent()) {
-                return "redirect:/";
+                return ResponseEntity.notFound().build();
             }
 
             Photo photo = photoOpt.get();
-            model.addAttribute("photo", photo);
-            model.addAttribute("aiEnabled", aiEnabled);
-
-            // Find previous and next photos for navigation
             Optional<Photo> previousPhoto = photoService.getPreviousPhoto(photo);
             Optional<Photo> nextPhoto = photoService.getNextPhoto(photo);
 
-            model.addAttribute("previousPhotoId", previousPhoto.isPresent() ? previousPhoto.get().getId() : null);
-            model.addAttribute("nextPhotoId", nextPhoto.isPresent() ? nextPhoto.get().getId() : null);
+            Map<String, Object> response = new HashMap<String, Object>();
+            response.put("photo", toPhotoMetadata(photo));
+            response.put("previousPhotoId", previousPhoto.isPresent() ? previousPhoto.get().getId() : null);
+            response.put("nextPhotoId", nextPhoto.isPresent() ? nextPhoto.get().getId() : null);
+            response.put("aiEnabled", aiEnabled);
 
-            return "detail";
+            return ResponseEntity.ok(response);
         } catch (Exception ex) {
             logger.error("Error loading photo with ID {}", id, ex);
-            return "redirect:/";
+            return ResponseEntity.status(500).body(errorResponse("Failed to load photo"));
         }
     }
 
-    /**
-     * Handles POST requests to delete a photo
-     */
-    @PostMapping("/{id}/delete")
-    public String deletePhoto(@PathVariable String id, RedirectAttributes redirectAttributes) {
+    @DeleteMapping("/api/photos/{id}")
+    public ResponseEntity<Map<String, Object>> deletePhoto(@PathVariable String id) {
+        Map<String, Object> response = new HashMap<String, Object>();
+
         try {
             boolean deleted = photoService.deletePhoto(id);
             if (deleted) {
                 logger.info("Photo {} deleted successfully", id);
-                redirectAttributes.addFlashAttribute("successMessage", "Photo deleted successfully");
+                response.put("success", true);
+                response.put("message", "Photo deleted successfully");
+                return ResponseEntity.ok(response);
             } else {
-                redirectAttributes.addFlashAttribute("errorMessage", "Photo not found");
+                response.put("success", false);
+                response.put("message", "Photo not found");
+                return ResponseEntity.status(404).body(response);
             }
         } catch (Exception ex) {
             logger.error("Error deleting photo {}", id, ex);
-            redirectAttributes.addFlashAttribute("errorMessage", "Failed to delete photo. Please try again.");
+            response.put("success", false);
+            response.put("message", "Failed to delete photo. Please try again.");
+            return ResponseEntity.status(500).body(response);
         }
-        return "redirect:/";
+    }
+
+    private Map<String, Object> toPhotoMetadata(Photo photo) {
+        Map<String, Object> photoMap = new HashMap<String, Object>();
+        photoMap.put("id", photo.getId());
+        photoMap.put("originalFileName", photo.getOriginalFileName());
+        photoMap.put("filePath", photo.getFilePath());
+        photoMap.put("uploadedAt", photo.getUploadedAt());
+        photoMap.put("fileSize", photo.getFileSize());
+        photoMap.put("width", photo.getWidth());
+        photoMap.put("height", photo.getHeight());
+        photoMap.put("mimeType", photo.getMimeType());
+        photoMap.put("description", photo.getDescription());
+        return photoMap;
+    }
+
+    private Map<String, Object> errorResponse(String message) {
+        Map<String, Object> response = new HashMap<String, Object>();
+        response.put("error", message);
+        return response;
     }
 }

@@ -13,9 +13,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
@@ -27,7 +28,7 @@ import java.util.Optional;
 /**
  * Controller for the main photo gallery page with upload functionality
  */
-@Controller
+@RestController
 public class HomeController {
 
     private static final Logger logger = LoggerFactory.getLogger(HomeController.class);
@@ -41,30 +42,34 @@ public class HomeController {
         this.aiEnabled = aiEnabled;
     }
 
-    /**
-     * Handler for GET requests - loads all photos for display
-     */
-    @GetMapping("/")
-    public String index(Model model) {
+    @GetMapping("/api/photos")
+    public ResponseEntity<Map<String, Object>> getPhotos() {
+        Map<String, Object> response = new HashMap<String, Object>();
+
         try {
             List<Photo> photos = photoService.getAllPhotos();
-            model.addAttribute("photos", photos);
-            model.addAttribute("timestamp", System.currentTimeMillis());
-            model.addAttribute("aiEnabled", aiEnabled);
+            List<Map<String, Object>> photoDtos = new ArrayList<Map<String, Object>>();
+
+            for (Photo photo : photos) {
+                photoDtos.add(toPhotoMetadata(photo));
+            }
+
+            response.put("photos", photoDtos);
+            response.put("aiEnabled", aiEnabled);
+            return ResponseEntity.ok(response);
         } catch (Exception ex) {
             logger.error("Error loading photos", ex);
-            model.addAttribute("photos", new ArrayList<Photo>());
-            model.addAttribute("timestamp", System.currentTimeMillis());
-            model.addAttribute("aiEnabled", aiEnabled);
+            response.put("photos", new ArrayList<Map<String, Object>>());
+            response.put("aiEnabled", aiEnabled);
+            response.put("error", "Failed to load photos");
+            return ResponseEntity.status(500).body(response);
         }
-        return "index";
     }
 
     /**
      * Handler for POST requests - uploads one or more photo files
      */
-    @PostMapping("/upload")
-    @ResponseBody
+    @PostMapping({"/upload", "/api/photos/upload"})
     public ResponseEntity<Map<String, Object>> uploadPhotos(@RequestParam("files") List<MultipartFile> files) {
         Map<String, Object> response = new HashMap<String, Object>();
         List<Map<String, Object>> uploadedPhotos = new ArrayList<Map<String, Object>>();
@@ -82,16 +87,7 @@ public class HomeController {
             if (result.isSuccess()) {
                 Optional<Photo> photoOpt = photoService.getPhotoById(result.getPhotoId());
                 if (photoOpt.isPresent()) {
-                    Photo photo = photoOpt.get();
-                    Map<String, Object> uploadedPhoto = new HashMap<String, Object>();
-                    uploadedPhoto.put("id", photo.getId());
-                    uploadedPhoto.put("originalFileName", photo.getOriginalFileName());
-                    uploadedPhoto.put("filePath", photo.getFilePath());
-                    uploadedPhoto.put("uploadedAt", photo.getUploadedAt());
-                    uploadedPhoto.put("fileSize", photo.getFileSize());
-                    uploadedPhoto.put("width", photo.getWidth());
-                    uploadedPhoto.put("height", photo.getHeight());
-                    uploadedPhotos.add(uploadedPhoto);
+                    uploadedPhotos.add(toPhotoMetadata(photoOpt.get()));
                 }
             } else {
                 Map<String, Object> failedUpload = new HashMap<String, Object>();
@@ -107,5 +103,19 @@ public class HomeController {
         response.put("aiEnabled", aiEnabled);
 
         return ResponseEntity.ok(response);
+    }
+
+    private Map<String, Object> toPhotoMetadata(Photo photo) {
+        Map<String, Object> photoMap = new HashMap<String, Object>();
+        photoMap.put("id", photo.getId());
+        photoMap.put("originalFileName", photo.getOriginalFileName());
+        photoMap.put("filePath", photo.getFilePath());
+        photoMap.put("uploadedAt", photo.getUploadedAt());
+        photoMap.put("fileSize", photo.getFileSize());
+        photoMap.put("width", photo.getWidth());
+        photoMap.put("height", photo.getHeight());
+        photoMap.put("mimeType", photo.getMimeType());
+        photoMap.put("description", photo.getDescription());
+        return photoMap;
     }
 }
