@@ -13,6 +13,7 @@ A photo gallery application built with Spring Boot and Oracle Database, featurin
 - 🗄️ **Database Storage**: Photo data stored as BLOBs in Oracle Database
 - 🗑️ **Delete Photos**: Remove photos from both gallery and detail views
 - 🎨 **Modern UI**: Clean, responsive design with Bootstrap 5
+- 🤖 **AI Descriptions**: Automatically generated image captions via Azure OpenAI (GPT-4o vision), displayed live without a page refresh
 
 ## Technology Stack
 
@@ -28,6 +29,7 @@ A photo gallery application built with Spring Boot and Oracle Database, featurin
 - Docker Desktop installed and running
 - Docker Compose (included with Docker Desktop)
 - Minimum 4GB RAM available for Oracle DB container
+- *(Optional)* Azure OpenAI resource with a GPT-4o (or other vision-capable) deployment for AI descriptions
 
 ## Quick Start
 
@@ -239,6 +241,58 @@ When contributing to this project:
 - Update documentation for any architectural changes
 - Preserve UUID system integrity
 - Add appropriate tests for new features
+
+## Azure OpenAI Integration
+
+When a photo is uploaded the application asynchronously calls Azure OpenAI to generate a natural-language description of the image. The description is displayed in both the gallery card and the detail view and appears **live without a page refresh** via a lightweight JavaScript polling mechanism.
+
+### Configuration
+
+Set the following properties in `application.properties` (or via environment variables):
+
+```properties
+azure.openai.enabled=true
+azure.openai.endpoint=https://YOUR_RESOURCE_NAME.openai.azure.com
+azure.openai.api-key=YOUR_API_KEY
+azure.openai.deployment-name=gpt-4o
+azure.openai.api-version=2024-02-15-preview
+```
+
+| Property | Description | Default |
+|---|---|---|
+| `azure.openai.enabled` | Enable/disable AI descriptions | `false` |
+| `azure.openai.endpoint` | Azure OpenAI resource endpoint URL | *(empty)* |
+| `azure.openai.api-key` | API key for the Azure OpenAI resource | *(empty)* |
+| `azure.openai.deployment-name` | Name of the deployed vision model | `gpt-4o` |
+| `azure.openai.api-version` | Azure OpenAI REST API version | `2024-02-15-preview` |
+
+When `azure.openai.enabled=false` the upload still succeeds and the gallery shows a "Generating description…" spinner that times out gracefully after ~2 minutes.
+
+### How It Works
+
+1. **Upload** – Photo is saved to Oracle DB. An async task (thread pool: `DescGen-*`) is fired immediately.  
+2. **AI call** – `AzureOpenAiService` encodes the image as a base64 data URL and posts a vision request to Azure OpenAI.  
+3. **Persist** – `PhotoDescriptionService` updates only the `DESCRIPTION` column via a targeted JPQL update (no BLOB reload).  
+4. **Live update** – The browser polls `GET /api/photos/{id}/description` every 3 seconds. When `ready: true` the description text is injected into the card / detail sidebar without a full page reload.
+
+### New API Endpoint
+
+```
+GET /api/photos/{id}/description
+```
+
+**Response:**
+```json
+{ "description": "A golden sunset over a calm ocean...", "ready": true }
+```
+or (while generating):
+```json
+{ "description": null, "ready": false }
+```
+
+### Database Schema Change
+
+A new nullable `DESCRIPTION` column (`VARCHAR2(2000)`) has been added to the `PHOTOS` table. Hibernate auto-creates this column on first startup (`ddl-auto=create`).
 
 ## License
 
