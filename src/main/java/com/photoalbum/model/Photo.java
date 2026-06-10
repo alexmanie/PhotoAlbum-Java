@@ -1,3 +1,9 @@
+/*
+    Class Name: Photo
+    Description: JPA entity representing uploaded photos and associated metadata.
+    Date Created: 2026-06-10
+*/
+
 package com.photoalbum.model;
 
 import javax.persistence.*;
@@ -89,6 +95,13 @@ public class Photo {
      */
     @Column(name = "height")
     private Integer height;
+
+    /**
+     * AI-generated description of the photo content
+     */
+    @Size(max = 2000)
+    @Column(name = "description", length = 2000)
+    private String description;
 
     // Default constructor
     public Photo() {
@@ -196,6 +209,14 @@ public class Photo {
 
     public void setHeight(Integer height) {
         this.height = height;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 
     @Override

@@ -1,3 +1,9 @@
+/*
+    Class Name: PhotoFileController
+    Description: Serves photo binary content by ID to the web UI.
+    Date Created: 2026-06-10
+*/
+
 package com.photoalbum.controller;
 
 import com.photoalbum.model.Photo;

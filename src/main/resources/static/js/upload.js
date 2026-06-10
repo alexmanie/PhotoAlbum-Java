@@ -112,7 +112,7 @@
 
                 if (result.uploadedPhotos && result.uploadedPhotos.length > 0) {
                     showSuccess(`Successfully uploaded ${result.uploadedPhotos.length} photo(s)!`);
-                    displayNewPhotos(result.uploadedPhotos);
+                    displayNewPhotos(result.uploadedPhotos, result.aiEnabled === true);
                 }
 
                 if (result.failedUploads && result.failedUploads.length > 0) {
@@ -132,7 +132,7 @@
         }
     }
 
-    function displayNewPhotos(photos) {
+    function displayNewPhotos(photos, aiEnabled) {
         // Remove "no photos" message if it exists
         const alertInfo = document.querySelector('#gallery-section .alert-info');
         if (alertInfo) {
@@ -153,12 +153,21 @@
 
         // Add photos to the beginning of the gallery
         photos.forEach((photo) => {
-            const photoCard = createPhotoCard(photo);
+            const photoCard = createPhotoCard(photo, aiEnabled);
             galleryElement.insertAdjacentHTML('afterbegin', photoCard);
+
+            // Start live polling for AI description on the newly inserted card
+            if (aiEnabled && window.startDescriptionPolling) {
+                const cardEl = galleryElement.querySelector(`[data-photo-id="${photo.id}"]`);
+                if (cardEl) {
+                    const descEl = cardEl.querySelector('.photo-description');
+                    window.startDescriptionPolling(photo.id, descEl, false);
+                }
+            }
         });
     }
 
-    function createPhotoCard(photo) {
+    function createPhotoCard(photo, aiEnabled) {
         const uploadDate = new Date(photo.uploadedAt);
         const formattedDate = uploadDate.toLocaleString('en-US', {
             month: 'short',
@@ -178,9 +187,18 @@
         const photoUrl = `/photo/${photo.id}?_t=${timestamp}`;
         const detailUrl = `/detail/${photo.id}`;
 
+        const descriptionArea = aiEnabled ? `
+                        <p class="card-text photo-description mt-1">
+                            <small class="text-muted fst-italic desc-placeholder">
+                                <span class="spinner-border spinner-border-sm me-1" style="width:.65em;height:.65em" role="status"></span>Generating description&hellip;
+                            </small>
+                        </p>` : '';
+
+        const pendingClass = aiEnabled ? ' desc-pending' : '';
+
         return `
             <div class="col-12 col-sm-6 col-md-4 col-lg-3 mb-4">
-                <div class="card photo-card h-100">
+                <div class="card photo-card h-100${pendingClass}" data-photo-id="${photo.id}">
                     <a href="${detailUrl}" class="photo-link">
                         <img src="${photoUrl}" class="card-img-top" alt="${photo.originalFileName}" loading="eager">
                     </a>
@@ -196,6 +214,7 @@
                                 ${Math.round(photo.fileSize / 1024)} KB${dimensions}
                             </small>
                         </p>
+                        ${descriptionArea}
                     </div>
                 </div>
             </div>

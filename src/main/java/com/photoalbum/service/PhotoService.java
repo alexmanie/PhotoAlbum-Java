@@ -1,3 +1,9 @@
+/*
+    Class Name: PhotoService
+    Description: Service contract for photo retrieval, upload, and navigation operations.
+    Date Created: 2026-06-10
+*/
+
 package com.photoalbum.service;
 
 import com.photoalbum.model.Photo;
@@ -52,4 +58,20 @@ public interface PhotoService {
      * @return Next photo if found, empty otherwise
      */
     Optional<Photo> getNextPhoto(Photo currentPhoto);
+
+    /**
+     * Get the description of a photo by ID (efficient lookup without loading photo data)
+     * @param id Photo ID
+     * @return Description if found, empty otherwise
+     */
+    Optional<String> getPhotoDescription(String id);
+
+    /**
+     * Asynchronously generate and save an AI description for a photo.
+     * Calls Azure OpenAI with the image data and persists the resulting description.
+     * @param photoId    The ID of the saved photo
+     * @param photoData  The raw image bytes to analyse
+     * @param mimeType   MIME type of the image (e.g. image/jpeg)
+     */
+    void triggerDescriptionGeneration(String photoId, byte[] photoData, String mimeType);
 }

@@ -1,9 +1,16 @@
+/*
+    Class Name: DetailController
+    Description: Handles detail view rendering and deletion for individual photos.
+    Date Created: 2026-06-10
+*/
+
 package com.photoalbum.controller;
 
 import com.photoalbum.model.Photo;
 import com.photoalbum.service.PhotoService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -21,9 +28,12 @@ public class DetailController {
     private static final Logger logger = LoggerFactory.getLogger(DetailController.class);
 
     private final PhotoService photoService;
+    private final boolean aiEnabled;
 
-    public DetailController(PhotoService photoService) {
+    public DetailController(PhotoService photoService,
+                            @Value("${azure.openai.enabled:false}") boolean aiEnabled) {
         this.photoService = photoService;
+        this.aiEnabled = aiEnabled;
     }
 
     /**
@@ -43,6 +53,7 @@ public class DetailController {
 
             Photo photo = photoOpt.get();
             model.addAttribute("photo", photo);
+            model.addAttribute("aiEnabled", aiEnabled);
 
             // Find previous and next photos for navigation
             Optional<Photo> previousPhoto = photoService.getPreviousPhoto(photo);

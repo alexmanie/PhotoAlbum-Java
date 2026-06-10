@@ -1,3 +1,9 @@
+/*
+    Class Name: MathUtil
+    Description: Provides reusable mathematical helper methods.
+    Date Created: 2026-06-10
+*/
+
 package com.photoalbum.util;
 
 /**
@@ -19,4 +25,19 @@ public class MathUtil {
         }
         return a;
     }
+
+    /**
+     * Calculate the sum of two integers
+     * @param a First integer
+     * @param b Second integer
+     * @return The sum of a and b
+     */
+    public static int sum(int a, int b) {
+        return a + b;
+    }
+
+    public static int min(int a, int b) {
+        return a < b ? a : b;
+    }
+
 }

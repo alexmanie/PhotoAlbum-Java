@@ -1,3 +1,9 @@
+/*
+    Class Name: HomeController
+    Description: Handles gallery display and photo upload requests.
+    Date Created: 2026-06-10
+*/
+
 package com.photoalbum.controller;
 
 import com.photoalbum.model.Photo;
@@ -5,6 +11,7 @@ import com.photoalbum.model.UploadResult;
 import com.photoalbum.service.PhotoService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -26,9 +33,12 @@ public class HomeController {
     private static final Logger logger = LoggerFactory.getLogger(HomeController.class);
 
     private final PhotoService photoService;
+    private final boolean aiEnabled;
 
-    public HomeController(PhotoService photoService) {
+    public HomeController(PhotoService photoService,
+                          @Value("${azure.openai.enabled:false}") boolean aiEnabled) {
         this.photoService = photoService;
+        this.aiEnabled = aiEnabled;
     }
 
     /**
@@ -39,12 +49,13 @@ public class HomeController {
         try {
             List<Photo> photos = photoService.getAllPhotos();
             model.addAttribute("photos", photos);
-            // Add timestamp for cache busting
             model.addAttribute("timestamp", System.currentTimeMillis());
+            model.addAttribute("aiEnabled", aiEnabled);
         } catch (Exception ex) {
             logger.error("Error loading photos", ex);
             model.addAttribute("photos", new ArrayList<Photo>());
             model.addAttribute("timestamp", System.currentTimeMillis());
+            model.addAttribute("aiEnabled", aiEnabled);
         }
         return "index";
     }
@@ -93,6 +104,7 @@ public class HomeController {
         response.put("success", !uploadedPhotos.isEmpty());
         response.put("uploadedPhotos", uploadedPhotos);
         response.put("failedUploads", failedUploads);
+        response.put("aiEnabled", aiEnabled);
 
         return ResponseEntity.ok(response);
     }

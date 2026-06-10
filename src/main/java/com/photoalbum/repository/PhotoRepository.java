@@ -1,13 +1,22 @@
+/*
+        Class Name: PhotoRepository
+        Description: Data access interface for photo persistence and custom queries.
+        Date Created: 2026-06-10
+*/
+
 package com.photoalbum.repository;
 
 import com.photoalbum.model.Photo;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Repository interface for Photo entity operations
@@ -20,7 +29,7 @@ public interface PhotoRepository extends JpaRepository<Photo, String> {
      * @return List of photos ordered by upload date descending
      */
     @Query(value = "SELECT ID, ORIGINAL_FILE_NAME, PHOTO_DATA, STORED_FILE_NAME, FILE_PATH, FILE_SIZE, " +
-                   "MIME_TYPE, UPLOADED_AT, WIDTH, HEIGHT " +
+                   "MIME_TYPE, UPLOADED_AT, WIDTH, HEIGHT, DESCRIPTION " +
                    "FROM PHOTOS " +
                    "ORDER BY UPLOADED_AT DESC", 
            nativeQuery = true)
@@ -33,7 +42,7 @@ public interface PhotoRepository extends JpaRepository<Photo, String> {
      */
     @Query(value = "SELECT * FROM (" +
                    "SELECT ID, ORIGINAL_FILE_NAME, PHOTO_DATA, STORED_FILE_NAME, FILE_PATH, FILE_SIZE, " +
-                   "MIME_TYPE, UPLOADED_AT, WIDTH, HEIGHT, ROWNUM as RN " +
+                   "MIME_TYPE, UPLOADED_AT, WIDTH, HEIGHT, DESCRIPTION, ROWNUM as RN " +
                    "FROM PHOTOS " +
                    "WHERE UPLOADED_AT < :uploadedAt " +
                    "ORDER BY UPLOADED_AT DESC" +
@@ -48,7 +57,7 @@ public interface PhotoRepository extends JpaRepository<Photo, String> {
      */
     @Query(value = "SELECT ID, ORIGINAL_FILE_NAME, PHOTO_DATA, STORED_FILE_NAME, " +
                    "NVL(FILE_PATH, 'default_path') as FILE_PATH, FILE_SIZE, " +
-                   "MIME_TYPE, UPLOADED_AT, WIDTH, HEIGHT " +
+                   "MIME_TYPE, UPLOADED_AT, WIDTH, HEIGHT, DESCRIPTION " +
                    "FROM PHOTOS " +
                    "WHERE UPLOADED_AT > :uploadedAt " +
                    "ORDER BY UPLOADED_AT ASC", 
@@ -62,7 +71,7 @@ public interface PhotoRepository extends JpaRepository<Photo, String> {
      * @return List of photos uploaded in the specified month
      */
     @Query(value = "SELECT ID, ORIGINAL_FILE_NAME, PHOTO_DATA, STORED_FILE_NAME, FILE_PATH, FILE_SIZE, " +
-                   "MIME_TYPE, UPLOADED_AT, WIDTH, HEIGHT " +
+                   "MIME_TYPE, UPLOADED_AT, WIDTH, HEIGHT, DESCRIPTION " +
                    "FROM PHOTOS " +
                    "WHERE TO_CHAR(UPLOADED_AT, 'YYYY') = :year " +
                    "AND TO_CHAR(UPLOADED_AT, 'MM') = :month " +
@@ -79,7 +88,7 @@ public interface PhotoRepository extends JpaRepository<Photo, String> {
     @Query(value = "SELECT * FROM (" +
                    "SELECT P.*, ROWNUM as RN FROM (" +
                    "SELECT ID, ORIGINAL_FILE_NAME, PHOTO_DATA, STORED_FILE_NAME, FILE_PATH, FILE_SIZE, " +
-                   "MIME_TYPE, UPLOADED_AT, WIDTH, HEIGHT " +
+                   "MIME_TYPE, UPLOADED_AT, WIDTH, HEIGHT, DESCRIPTION " +
                    "FROM PHOTOS ORDER BY UPLOADED_AT DESC" +
                    ") P WHERE ROWNUM <= :endRow" +
                    ") WHERE RN >= :startRow", 
@@ -91,11 +100,30 @@ public interface PhotoRepository extends JpaRepository<Photo, String> {
      * @return List of photos with running totals and rankings
      */
     @Query(value = "SELECT ID, ORIGINAL_FILE_NAME, PHOTO_DATA, STORED_FILE_NAME, FILE_PATH, FILE_SIZE, " +
-                   "MIME_TYPE, UPLOADED_AT, WIDTH, HEIGHT, " +
+                   "MIME_TYPE, UPLOADED_AT, WIDTH, HEIGHT, DESCRIPTION, " +
                    "RANK() OVER (ORDER BY FILE_SIZE DESC) as SIZE_RANK, " +
                    "SUM(FILE_SIZE) OVER (ORDER BY UPLOADED_AT ROWS UNBOUNDED PRECEDING) as RUNNING_TOTAL " +
                    "FROM PHOTOS " +
                    "ORDER BY UPLOADED_AT DESC", 
            nativeQuery = true)
     List<Object[]> findPhotosWithStatistics();
+
+    /**
+     * Find the description of a photo by ID (efficient - avoids loading BLOB)
+     * @param id Photo ID
+     * @return Description if found
+     */
+    @Query("SELECT p.description FROM Photo p WHERE p.id = :id")
+    Optional<String> findDescriptionById(@Param("id") String id);
+
+    /**
+     * Update only the description field of a photo
+     * @param id Photo ID
+     * @param description The AI-generated description
+     * @return Number of rows updated
+     */
+    @Modifying
+    @Transactional
+    @Query("UPDATE Photo p SET p.description = :description WHERE p.id = :id")
+    int updateDescription(@Param("id") String id, @Param("description") String description);
 }

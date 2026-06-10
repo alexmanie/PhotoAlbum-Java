@@ -1,3 +1,9 @@
+/*
+    Class Name: UploadResult
+    Description: Encapsulates success and error information for upload operations.
+    Date Created: 2026-06-10
+*/
+
 package com.photoalbum.model;
 
 /**

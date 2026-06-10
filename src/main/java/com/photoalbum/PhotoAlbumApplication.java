@@ -1,3 +1,9 @@
+/*
+    Class Name: PhotoAlbumApplication
+    Description: Spring Boot entry point for the Photo Album application.
+    Date Created: 2026-06-10
+*/
+
 package com.photoalbum;
 
 import org.springframework.boot.SpringApplication;

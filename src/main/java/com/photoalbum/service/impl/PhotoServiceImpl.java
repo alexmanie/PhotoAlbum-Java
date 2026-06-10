@@ -1,8 +1,15 @@
+/*
+    Class Name: PhotoServiceImpl
+    Description: Implements photo service logic for validation and database operations.
+    Date Created: 2026-06-10
+*/
+
 package com.photoalbum.service.impl;
 
 import com.photoalbum.model.Photo;
 import com.photoalbum.model.UploadResult;
 import com.photoalbum.repository.PhotoRepository;
+import com.photoalbum.service.PhotoDescriptionService;
 import com.photoalbum.service.PhotoService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,14 +37,17 @@ public class PhotoServiceImpl implements PhotoService {
     private static final Logger logger = LoggerFactory.getLogger(PhotoServiceImpl.class);
 
     private final PhotoRepository photoRepository;
+    private final PhotoDescriptionService photoDescriptionService;
     private final long maxFileSizeBytes;
     private final List<String> allowedMimeTypes;
 
     public PhotoServiceImpl(
             PhotoRepository photoRepository,
+            PhotoDescriptionService photoDescriptionService,
             @Value("${app.file-upload.max-file-size-bytes}") long maxFileSizeBytes,
             @Value("${app.file-upload.allowed-mime-types}") String[] allowedMimeTypes) {
         this.photoRepository = photoRepository;
+        this.photoDescriptionService = photoDescriptionService;
         this.maxFileSizeBytes = maxFileSizeBytes;
         this.allowedMimeTypes = Arrays.asList(allowedMimeTypes);
     }
@@ -157,6 +167,13 @@ public class PhotoServiceImpl implements PhotoService {
 
                 logger.info("Successfully uploaded photo {} with ID {} to Oracle database", 
                     file.getOriginalFilename(), photo.getId());
+
+                // Trigger async AI description generation (fire-and-forget)
+                final String savedPhotoId = photo.getId();
+                final byte[] savedPhotoData = photoData;
+                final String savedMimeType = file.getContentType();
+                photoDescriptionService.generateAndSave(savedPhotoId, savedPhotoData, savedMimeType);
+
             } catch (Exception ex) {
                 logger.error("Error saving photo to Oracle database for {}", file.getOriginalFilename(), ex);
                 result.setSuccess(false);
@@ -214,6 +231,28 @@ public class PhotoServiceImpl implements PhotoService {
     public Optional<Photo> getNextPhoto(Photo currentPhoto) {
         List<Photo> newerPhotos = photoRepository.findPhotosUploadedAfter(currentPhoto.getUploadedAt());
         return newerPhotos.isEmpty() ? Optional.<Photo>empty() : Optional.of(newerPhotos.get(0));
+    }
+
+    /**
+     * Get the description of a photo by ID without loading photo data
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<String> getPhotoDescription(String id) {
+        try {
+            return photoRepository.findDescriptionById(id);
+        } catch (Exception ex) {
+            logger.error("Error retrieving description for photo {}", id, ex);
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Trigger asynchronous AI description generation for a photo
+     */
+    @Override
+    public void triggerDescriptionGeneration(String photoId, byte[] photoData, String mimeType) {
+        photoDescriptionService.generateAndSave(photoId, photoData, mimeType);
     }
 
     /**
